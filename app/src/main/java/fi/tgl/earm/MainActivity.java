@@ -1,6 +1,11 @@
 package fi.tgl.earm;
 
 import android.app.Activity;
+import android.content.Context;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -19,7 +24,7 @@ import java.util.Date;
 
 import io.esense.esenselib.*;
 
-public class MainActivity extends Activity implements ESenseConnectionListener, ESenseSensorListener {
+public class MainActivity extends Activity implements ESenseConnectionListener, ESenseSensorListener, SensorEventListener {
 
     private static final String TAG = "MainActivity";
     private static final String DeviceName = "eSense-0056";
@@ -27,9 +32,12 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
     private int id;
     private long startTime;
     private long progressTime;
-    private ArrayList<Long> timeData;
-    private ArrayList<Long> currentTimeData;
-    private ArrayList<ArrayList<Short>> data;
+    private ArrayList<Long> eSenseTimeData;
+    private ArrayList<Long> eSenseCurrentTimeData;
+    private ArrayList<ArrayList<Short>> eSenseData;
+    private ArrayList<ArrayList<Float>> phoneData;
+    private ArrayList<Long> phoneTimeData;
+    private ArrayList<Long> phoneCurrentTimeData;
     private TextView statusText;
     private EditText idText;
     private Button startButton;
@@ -45,8 +53,12 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
         startButton = findViewById(R.id.StartButton);
         statusText.setText("Finding eSense...");
 
-        ESenseManager manager = new ESenseManager(DeviceName, this,this);
-        manager.connect(1000);
+        SensorManager phoneManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
+        Sensor acc = phoneManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        phoneManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_FASTEST);
+
+        ESenseManager eSenseManager = new ESenseManager(DeviceName, this,this);
+        eSenseManager.connect(1000);
     }
 
     @Override
@@ -110,11 +122,11 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
         Log.d(TAG, "onSensorChanged: " + val[0] + ", " + val[1] + ", " + val[2]);
         if (isMeasuring) {
             for (int i = 0; i < 3; i++) {
-                data.get(i).add(val[i]);
+                eSenseData.get(i).add(val[i]);
             }
             progressTime = System.nanoTime() - startTime;
-            timeData.add(progressTime);
-            currentTimeData.add(System.currentTimeMillis());
+            eSenseTimeData.add(progressTime);
+            eSenseCurrentTimeData.add(System.currentTimeMillis());
         }
     }
 
@@ -134,12 +146,19 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
                 isMeasuring = true;
                 startButton.setText(R.string.stop_button_text);
                 statusText.setText("Measuring...");
-                data = new ArrayList<>();
-                timeData = new ArrayList<>();
-                currentTimeData = new ArrayList<>();
+                eSenseData = new ArrayList<>();
+                eSenseTimeData = new ArrayList<>();
+                eSenseCurrentTimeData = new ArrayList<>();
                 for (int i = 0; i < 3; i++) {
                     ArrayList<Short> arr = new ArrayList<>();
-                    data.add(arr);
+                    eSenseData.add(arr);
+                }
+                phoneData = new ArrayList<>();
+                phoneTimeData = new ArrayList<>();
+                phoneCurrentTimeData = new ArrayList<>();
+                for (int i = 0; i < 3; i++) {
+                    ArrayList<Float> arr = new ArrayList<>();
+                    phoneData.add(arr);
                 }
                 id = Integer.parseInt(idText.getText().toString());
                 startTime = System.nanoTime();
@@ -150,21 +169,21 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
     private void OutputFile() {
         Date date = new Date();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_kkmmss");
-        String filename = sdf.format(date) + ".csv";
+        String filename = "eSense_" + String.format("%03d", id) + "_" + sdf.format(date) + ".csv";
         Log.d(TAG, filename);
         try {
-            FileOutputStream fout = openFileOutput("eSense_" + String.format("%03d", id) + "_" + filename, MODE_PRIVATE);
+            FileOutputStream fout = openFileOutput(filename, MODE_PRIVATE);
             String comma = ",";
             String newline = "\n";
-            for (int i = 0; i < data.get(0).size(); i++) {
+            for (int i = 0; i < eSenseData.get(0).size(); i++) {
                 for (int j = 0; j < 3; j++)
                 {
-                    fout.write(String.valueOf(data.get(j).get(i)).getBytes());
+                    fout.write(String.valueOf(eSenseData.get(j).get(i)).getBytes());
                     fout.write(comma.getBytes());
                 }
-                fout.write(String.format("%.6f", Float.parseFloat(timeData.get(i).toString())/1000000000f).getBytes());
+                fout.write(String.format("%.6f", Float.parseFloat(eSenseTimeData.get(i).toString())/1000000000f).getBytes());
                 fout.write(comma.getBytes());
-                fout.write(String.valueOf(currentTimeData.get(i)).getBytes());
+                fout.write(String.valueOf(eSenseCurrentTimeData.get(i)).getBytes());
                 fout.write(newline.getBytes());
             }
             fout.close();
@@ -176,5 +195,52 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
             Log.d(TAG, "Cannot write string.");
             e.printStackTrace();
         }
+
+        filename = "Phone_" + String.format("%03d", id) + "_" + sdf.format(date) + ".csv";
+        Log.d(TAG, filename);
+        try {
+            FileOutputStream fout = openFileOutput(filename, MODE_PRIVATE);
+            String comma = ",";
+            String newline = "\n";
+            for (int i = 0; i < phoneData.get(0).size(); i++) {
+                for (int j = 0; j < 3; j++)
+                {
+                    fout.write(String.valueOf(phoneData.get(j).get(i)).getBytes());
+                    fout.write(comma.getBytes());
+                }
+                fout.write(String.format("%.6f", Float.parseFloat(phoneTimeData.get(i).toString())/1000000000f).getBytes());
+                fout.write(comma.getBytes());
+                fout.write(String.valueOf(phoneCurrentTimeData.get(i)).getBytes());
+                fout.write(newline.getBytes());
+            }
+            fout.close();
+            Log.d(TAG, "File created.");
+        } catch (FileNotFoundException e) {
+            Log.d(TAG, "Cannot open file.");
+            e.printStackTrace();
+        } catch (IOException e) {
+            Log.d(TAG, "Cannot write string.");
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (isMeasuring) {
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+            for (int i = 0; i < 3; i++) {
+                phoneData.get(i).add(event.values[i]);
+            }
+            progressTime = System.nanoTime() - startTime;
+            phoneTimeData.add(progressTime);
+            phoneCurrentTimeData.add(System.currentTimeMillis());
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
     }
 }
