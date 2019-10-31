@@ -135,8 +135,19 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
         if (isMeasuring){
             isMeasuring = false;
             startButton.setText(R.string.start_button_text);
-            statusText.setText("Tap to Start");
-            OutputFile();
+            statusText.setText("Writing...");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    OutputFile();
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            statusText.setText("Tap to start");
+                        }
+                    });
+                }
+            }).start();
         }
         else {
             if (idText.getText().toString().equals("")) {
@@ -187,6 +198,7 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
                 fout.write(newline.getBytes());
             }
             fout.close();
+            //statusText.setText("Tap to start");
             Log.d(TAG, "File created.");
         } catch (FileNotFoundException e) {
             Log.d(TAG, "Cannot open file.");
