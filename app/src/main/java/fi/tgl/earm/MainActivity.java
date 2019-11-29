@@ -58,7 +58,7 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
         phoneManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_FASTEST);
 
         ESenseManager eSenseManager = new ESenseManager(DeviceName, this,this);
-        eSenseManager.connect(1000);
+        eSenseManager.connect(5000);
     }
 
     @Override
@@ -189,7 +189,7 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
             for (int i = 0; i < eSenseData.get(0).size(); i++) {
                 for (int j = 0; j < 3; j++)
                 {
-                    fout.write(String.valueOf(eSenseData.get(j).get(i)).getBytes());
+                    fout.write(String.valueOf((float)eSenseData.get(j).get(i)/1000f).getBytes());
                     fout.write(comma.getBytes());
                 }
                 fout.write(String.format("%.6f", Float.parseFloat(eSenseTimeData.get(i).toString())/1000000000f).getBytes());
