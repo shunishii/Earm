@@ -186,6 +186,7 @@ public class MainActivity extends Activity implements ESenseConnectionListener, 
             FileOutputStream fout = openFileOutput(filename, MODE_PRIVATE);
             String comma = ",";
             String newline = "\n";
+            fout.write("x,y,z,time,localTime\n".getBytes());
             for (int i = 0; i < eSenseData.get(0).size(); i++) {
                 for (int j = 0; j < 3; j++)
                 {
